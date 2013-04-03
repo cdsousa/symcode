@@ -50,22 +50,22 @@ void diffs( double* out, const double* x )
 {
   double cse0 = -((x)*(x));
   double cse11 = -x;
-  double tmp6 = -16*cse0 + 4*pow(cse11, 3)/3 + 56*cse11 + 56;
-  double cse6 = tmp6/210;
-  double cse17 = -sqrt(70)*exp(cse11);
+  double tmp6 = -16.0*cse0 + 1.33333333333333*pow(cse11, 3) + 56.0*cse11 + 56.0;
+  double cse6 = 0.00476190476190476*tmp6;
+  double cse17 = -8.36660026534076*exp(cse11);
   double tmp9 = cse0*cse17*cse6;
-  double tmp12 = 4*cse0 - 32*cse11 - 56;
+  double tmp12 = 4.0*cse0 - 32.0*cse11 - 56.0;
   double tmp14 = -cse0*cse17*cse6;
-  double tmp18 = 8*cse11 + 32;
-  double cse1 = 2*tmp12/105;
-  double cse2 = tmp12/35;
-  double cse3 = 4*cse2;
-  double cse4 = 2*tmp12/7;
-  double cse5 = 2*tmp18/7;
-  double cse7 = tmp6/105;
-  double cse8 = tmp6/35;
-  double cse9 = 2*cse8;
-  double cse10 = 2*tmp6/21;
+  double tmp18 = 8.0*cse11 + 32.0;
+  double cse1 = 0.019047619047619*tmp12;
+  double cse2 = 0.0285714285714286*tmp12;
+  double cse3 = 4.0*cse2;
+  double cse4 = 0.285714285714286*tmp12;
+  double cse5 = 0.285714285714286*tmp18;
+  double cse7 = 0.00952380952380952*tmp6;
+  double cse8 = 0.0285714285714286*tmp6;
+  double cse9 = 2.0*cse8;
+  double cse10 = 0.0952380952380952*tmp6;
   double cse12 = -cse0*tmp12;
   double cse13 = -cse0*tmp18;
   double cse14 = -cse11*tmp12;
@@ -73,16 +73,16 @@ void diffs( double* out, const double* x )
   double cse16 = -cse11*tmp6;
 
   out[0] = tmp9;
-  out[1] = cse0*cse17*cse2/6 + cse11*cse17*cse7 + tmp14;
-  out[2] = -cse0*cse17*cse2/3 + cse1*cse11*cse17 - 2*cse11*cse17*cse7 - cse13*cse17/210 - cse17*cse7 + tmp9;
-  out[3] = cse0*cse17*cse2/2 - 4*cse0*cse17/105 - 2*cse11*cse17*cse2 + cse11*cse17*cse8 + cse13*cse17/70 - cse15*cse17/35 - cse17*cse2 + cse17*cse8 + tmp14;
-  out[4] = -cse0*cse1*cse17 + 16*cse0*cse17/105 + cse11*cse17*cse3 - 2*cse11*cse17*cse5/5 - 4*cse11*cse17*cse7 - 32*cse11*cse17/105 - cse13*cse17/35 + cse17*cse3 - cse17*cse5/5 - cse17*cse9 + tmp9;
-  out[5] = -8*cse0*cse17/21 + cse10*cse17 - 2*cse11*cse17*cse4/3 + cse11*cse17*cse5 + 32*cse11*cse17/21 - cse12*cse17/42 + cse13*cse17/21 - cse16*cse17/21 - cse17*cse4 + cse17*cse5 + 16*cse17/21 + tmp14;
-  out[6] = -cse0*cse17*cse2 + 16*cse0*cse17/21 + cse11*cse17*cse4 - 2*cse11*cse17*cse5 - cse11*cse17*cse9 - 32*cse11*cse17/7 - cse13*cse17/14 + 2*cse17*cse4 - 3*cse17*cse5 - cse17*tmp6/7 - 32*cse17/7 + tmp9;
-  out[7] = -4*cse0*cse17/3 + 32*cse11*cse17/3 - cse12*cse17/30 + cse13*cse17/10 + 2*cse14*cse17/5 - cse15*cse17 - cse16*cse17/15 - cse17*tmp12 + 2*cse17*tmp18 + cse17*tmp6/5 + 16*cse17 + tmp14;
-  out[8] = -2*cse0*cse1*cse17 + 32*cse0*cse17/15 - 8*cse11*cse17*cse7 - 64*cse11*cse17/3 - 2*cse13*cse17/15 - 8*cse14*cse17/15 + 8*cse15*cse17/5 + 8*cse17*tmp12/5 - 4*cse17*tmp18 - 4*cse17*tmp6/15 - 128*cse17/3 + tmp9;
-  out[9] = 3*cse0*cse17*cse2/2 - 3*cse0*cse17*cse5/5 - 16*cse0*cse17/5 - 6*cse11*cse17*cse3 + 3*cse11*cse17*cse8 + 192*cse11*cse17/5 - 12*cse15*cse17/5 + 6*cse17*cse9 - 12*cse17*tmp12/5 + 36*cse17*tmp18/5 + 96*cse17 + tmp14;
-  out[10] = 32*cse0*cse17/7 - cse10*cse11*cse17 + 3*cse11*cse17*cse4 - 12*cse11*cse17*cse5 - 64*cse11*cse17 + cse12*cse17/21 - 3*cse13*cse17/14 + 12*cse17*cse4 - 12*cse17*tmp18 - 3*cse17*tmp6/7 - 192*cse17 + tmp9;
+  out[1] = 0.166666666666667*cse0*cse17*cse2 + cse11*cse17*cse7 + tmp14;
+  out[2] = -0.333333333333333*cse0*cse17*cse2 + cse1*cse11*cse17 - 2.0*cse11*cse17*cse7 - 0.00476190476190476*cse13*cse17 - cse17*cse7 + tmp9;
+  out[3] = 0.5*cse0*cse17*cse2 - 0.0380952380952381*cse0*cse17 - 2.0*cse11*cse17*cse2 + cse11*cse17*cse8 + 0.0142857142857143*cse13*cse17 - 0.0285714285714286*cse15*cse17 - cse17*cse2 + cse17*cse8 + tmp14;
+  out[4] = -cse0*cse1*cse17 + 0.152380952380952*cse0*cse17 + cse11*cse17*cse3 - 0.4*cse11*cse17*cse5 - 4.0*cse11*cse17*cse7 - 0.304761904761905*cse11*cse17 - 0.0285714285714286*cse13*cse17 + cse17*cse3 - 0.2*cse17*cse5 - cse17*cse9 + tmp9;
+  out[5] = -0.380952380952381*cse0*cse17 + cse10*cse17 - 0.666666666666667*cse11*cse17*cse4 + cse11*cse17*cse5 + 1.52380952380952*cse11*cse17 - 0.0238095238095238*cse12*cse17 + 0.0476190476190476*cse13*cse17 - 0.0476190476190476*cse16*cse17 - cse17*cse4 + cse17*cse5 + 0.761904761904762*cse17 + tmp14;
+  out[6] = -cse0*cse17*cse2 + 0.761904761904762*cse0*cse17 + cse11*cse17*cse4 - 2.0*cse11*cse17*cse5 - cse11*cse17*cse9 - 4.57142857142857*cse11*cse17 - 0.0714285714285714*cse13*cse17 + 2.0*cse17*cse4 - 3.0*cse17*cse5 - 0.142857142857143*cse17*tmp6 - 4.57142857142857*cse17 + tmp9;
+  out[7] = -1.33333333333333*cse0*cse17 + 10.6666666666667*cse11*cse17 - 0.0333333333333333*cse12*cse17 + 0.1*cse13*cse17 + 0.4*cse14*cse17 - cse15*cse17 - 0.0666666666666667*cse16*cse17 - cse17*tmp12 + 2.0*cse17*tmp18 + 0.2*cse17*tmp6 + 16.0*cse17 + tmp14;
+  out[8] = -2.0*cse0*cse1*cse17 + 2.13333333333333*cse0*cse17 - 8.0*cse11*cse17*cse7 - 21.3333333333333*cse11*cse17 - 0.133333333333333*cse13*cse17 - 0.533333333333333*cse14*cse17 + 1.6*cse15*cse17 + 1.6*cse17*tmp12 - 4.0*cse17*tmp18 - 0.266666666666667*cse17*tmp6 - 42.6666666666667*cse17 + tmp9;
+  out[9] = 1.5*cse0*cse17*cse2 - 0.6*cse0*cse17*cse5 - 3.2*cse0*cse17 - 6.0*cse11*cse17*cse3 + 3.0*cse11*cse17*cse8 + 38.4*cse11*cse17 - 2.4*cse15*cse17 + 6.0*cse17*cse9 - 2.4*cse17*tmp12 + 7.2*cse17*tmp18 + 96.0*cse17 + tmp14;
+  out[10] = 4.57142857142857*cse0*cse17 - cse10*cse11*cse17 + 3.0*cse11*cse17*cse4 - 12.0*cse11*cse17*cse5 - 64.0*cse11*cse17 + 0.0476190476190476*cse12*cse17 - 0.214285714285714*cse13*cse17 + 12.0*cse17*cse4 - 12.0*cse17*tmp18 - 0.428571428571429*cse17*tmp6 - 192.0*cse17 + tmp9;
 
   return;
 }
