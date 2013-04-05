@@ -87,3 +87,21 @@ void diffs( double* out, const double* x )
   return;
 }
 ```
+Author
+------
+
+[Cristóvão Duarte Sousa](https://github.com/cdsousa)
+
+Install
+-------
+
+From git source:
+
+    git clone git@github.com:cdsousa/symcode.git
+    cd symcode
+    python setup.py install
+
+License
+-------
+
+New BSD license. See LICENSE.txt
