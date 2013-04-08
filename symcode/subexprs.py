@@ -1,6 +1,6 @@
 
 import sympy
-
+import sympy.utilities
 
 
 class Subexprs(object):
