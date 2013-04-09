@@ -95,7 +95,7 @@ def optim_cse( code, auxvarname = 'cse' ):
 
 
 def optim_cp( code ):
-    """Performe 'copy propagation' optimization on code."""
+    """Performe 'constant folding' and 'copy propagation' optimization on code."""
     
     debug = False
     removed=0
@@ -104,8 +104,13 @@ def optim_cp( code ):
     toremove = []
     
     for i in range(len(retcode[0])):
+      
+       # constant folding
         v = retcode[0][i][0]
-        e = retcode[0][i][1]
+        e = retcode[0][i][1].n()
+        retcode[0][i] = (v,e)
+        
+        # copy propagation
         if e.is_Atom:
             if debug: print(i,v,e,'is atom')
             retcode = xreplace( retcode, {v:e} )
@@ -115,6 +120,10 @@ def optim_cp( code ):
 
     for r in reversed(toremove):
         retcode[0].pop(r)
+        
+    # output expression constant folding
+    for i,e in enumerate(retcode[1]):
+      retcode[1][i] = e.n()
     
     if debug: print('removed',removed)
     return retcode
@@ -231,7 +240,7 @@ def fully_optimize_code( code, ivarnames=None, singlevarout=False, clearcache=0,
   code = optim_cse(code,'cse')
   if clearcache > 1: sympy.cache.clear_cache()
   
-  if debug: _fprint(' copy propagation')
+  if debug: _fprint(' constant folding and copy propagation')
   code = optim_cp(code)
   if clearcache > 1: sympy.cache.clear_cache()
   

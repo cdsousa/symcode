@@ -30,7 +30,7 @@ def code_back_to_exprs(code):
     return exps
 
 def _ccode( expr, ):
-  code = sympy.ccode( expr.n() )
+  code = sympy.ccode( expr )
   if options['unroll_square']:
     return re.sub(r'pow\(([^,]*), 2\)', r'((\1)*(\1))', code)
   else:
