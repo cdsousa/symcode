@@ -6,93 +6,63 @@ import collections
 
 class Subexprs(object):
        
-  def __init__(self, mode='unique_ops', ivars_name='tmp'):
+  def __init__(self, ivars_name='tmp', comn_subexpr_elim=True, opt_muladd=True):
     
     self.symbols = sympy.utilities.iterables.numbered_symbols(ivars_name, start=0, real=True)
     self.subexprs_dict = dict()
+    
+    self.opt_muladd = opt_muladd
+    
     self.muls_2a = dict()
     self.muls_ma = dict()
     self.adds_2a = dict()
     self.adds_ma = dict()
     
-    if mode == 'unique_ops':
-      self._collect_func = self._collect_uniqueops
-      self._collect_op_func = self._collect_op
-    elif mode == 'unique_ops_deep':
-      self._collect_func = self._collect_uniqueops
-      self._collect_op_func = self._collect_op_deep
-    elif mode == 'whole_exprs':
-      self._collect_func = self._collect_exprs
+    if comn_subexpr_elim:
+      self._collect_func = self._collect_unique_ops
     else:
-      raise Exception("No '%s' sub-expression collection mode known."%mode)
+      self._collect_func = self._collect_expr
+    
+    
     
   @property
   def subexprs(self): return self.get_subexprs()
   
-  class GetSubexprs(object):
-    
-    def __init__(self, expr, subexprs_invdict, subexprs_ordereddict):
-      self.subexprs_invdict = subexprs_invdict
-      self.subexprs_ordereddict = subexprs_ordereddict
-      if expr is not None:
-        self._subexprs(expr)
-      else:
-        for symb in self.subexprs_invdict:
-          self._subexprs(symb)
-        
-    def _subexprs(self, expr):
-      for symb in expr.free_symbols:
-        if symb not in self.subexprs_ordereddict and symb in self.subexprs_invdict:
-          subexpr = self.subexprs_invdict[symb]
-          self._subexprs(subexpr)
-          self.subexprs_ordereddict[symb] = subexpr
             
-  def get_subexprs(self, out_exprs=[None]):
+  def get_subexprs(self, out_exprs=None):
     subexprs_invdict = {v:k for k,v in self.subexprs_dict.items()}
     subexprs_ordereddict = collections.OrderedDict()
+    def _subexprs(expr):
+      for symb in expr.free_symbols:
+        if symb not in subexprs_ordereddict and symb in subexprs_invdict:
+          subexpr = subexprs_invdict[symb]
+          _subexprs(subexpr)
+          subexprs_ordereddict[symb] = subexpr
     if isinstance(out_exprs, sympy.Basic): # if only one expression is passed
       out_exprs = [out_exprs]
+    if out_exprs is None:
+      out_exprs = subexprs_invdict.keys()
     for expr in out_exprs:
-      self.GetSubexprs(expr, subexprs_invdict, subexprs_ordereddict)
+      _subexprs(expr)
     return subexprs_ordereddict.items()
     
-    
-  def _collect_exprs(self, expr):
-    if expr.is_Atom:
-      return expr
-    else:
-      new_ivar = next(self.symbols)
-      self.subexprs_dict[expr] = new_ivar
-      return new_ivar
-    
-    
+   
   
-  def _collect_uniqueops(self, expr):
+  def _collect_unique_ops(self, expr):
     if expr.is_Atom:
         return expr
     else:
         new_args = []
         for arg in expr.args:
-          new_args.append( self._collect_uniqueops(arg) )
-        return self._collect_op_func(type(expr)(*new_args))
-      
-      
+          new_args.append( self._collect_unique_ops(arg) )
+        return self._collect_op(type(expr)(*new_args))
+  
   def _collect_op(self, expr):
     if expr in self.subexprs_dict:
       return self.subexprs_dict[expr]
     else:
-      new_ivar = next(self.symbols)
-      self.subexprs_dict[expr] = new_ivar
-      return new_ivar
       
-  
-  
-  def _collect_op_deep(self, expr):
-    if expr in self.subexprs_dict:
-      return self.subexprs_dict[expr]
-    else:
-      
-      if isinstance(expr, sympy.Mul):
+      if self.opt_muladd and expr.is_Mul:
         
         args = expr.args
         if len(args) == 2:
@@ -131,7 +101,7 @@ class Subexprs(object):
                 self.muls_2a[expr] = new_ivar
                 return new_ivar
               else:
-                return self._collect_op_deep(expr)
+                return self._collect_op(expr)
               
           for exprB in self.muls_ma:
             intersect = args_set.intersection(set(exprB.args))
@@ -167,8 +137,8 @@ class Subexprs(object):
                   self.muls_ma[new_expr] = new_ivar
                   return new_ivar
                 else:
-                  print('check this')
-                  return self._collect_op_deep(new_expr)
+                  print('check symcode.subexprs.Subexprs._collect_op()')
+                  return self._collect_op(new_expr)
         
           new_ivar = next(self.symbols)
           self.subexprs_dict[expr] = new_ivar
@@ -176,7 +146,7 @@ class Subexprs(object):
           return new_ivar
             
           
-      elif isinstance(expr, sympy.Add):
+      elif self.opt_muladd and expr.is_Add:
         
         args = expr.args
         if len(args) == 2:
@@ -215,7 +185,7 @@ class Subexprs(object):
                 self.adds_2a[expr] = new_ivar
                 return new_ivar
               else:
-                return self._collect_op_deep(expr)
+                return self._collect_op(expr)
               
           for exprB in self.adds_ma:
             intersect = args_set.intersection(set(exprB.args))
@@ -251,7 +221,7 @@ class Subexprs(object):
                   self.adds_ma[new_expr] = new_ivar
                   return new_ivar
                 else:
-                  return self._collect_op_deep(new_expr)
+                  return self._collect_op(new_expr)
         
           new_ivar = next(self.symbols)
           self.subexprs_dict[expr] = new_ivar
@@ -259,13 +229,23 @@ class Subexprs(object):
           return new_ivar
             
           
-        
-          
       else:
         new_ivar = next(self.symbols)
         self.subexprs_dict[expr] = new_ivar
         return new_ivar
       
+
+    
+  def _collect_expr(self, expr):
+    if expr.is_Atom:
+      return expr
+    else:
+      new_ivar = next(self.symbols)
+      self.subexprs_dict[expr] = new_ivar
+      return new_ivar
+    
+
+
     
   def collect(self, exprs):
     

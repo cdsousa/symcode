@@ -1,101 +1,73 @@
 
+import collections
 import copy
 import sympy
 import sys
 
+from . import subexprs
 
 
-def apply_func( code, func ):
-  sube = [None]*len(code[0])
-  oute = copy.deepcopy(code[1])
-  for (i,(v,e)) in enumerate(code[0]):
-    sube[i] = ( v, func(e) )
-  for i,e in enumerate(code[1]):
-    oute[i] = func(e)
-  return (sube, oute)
-
-
-def xreplace( code, xreplace_dict ):
-  return apply_func( code, lambda x: x.xreplace( xreplace_dict ) )
-
-
-def optim_dce( code ):
+def dead_code_elim( code ):
     """Performe 'dead code elimination' optimization on code."""
     
-    ivs = []
+    se = subexprs.Subexprs()
+    se.subexprs_dict = {v:k for k, v in dict(code[0]).items()}
+    return (se.get_subexprs(code[1]), copy.deepcopy(code[1]))
+
+
+def inlining_singleops( code ):
+    """Performe inlining of once used variables (and elimination of not used variables).
+
+    Expects code with only one operation per subexpression
+
+    """
     
-    n = len(code[0])
+    subexprs_invdict = dict(code[0])
     
-    for i in range(len(code[0])-1,-1,-1):
-        s = code[0][i][0]
+    ivs_set = set(subexprs_invdict.keys())
+    
+    used_ivs = set()
+    used_morethanonce_ivs = set()
+    
+    for expr in subexprs_invdict.values():
+        ivs = expr.free_symbols & ivs_set
+        used_morethanonce_ivs |= ivs & used_ivs
+        used_ivs |= ivs
+    
+    for expr in code[1]:
+        ivs = expr.free_symbols & ivs_set
+        used_morethanonce_ivs |= ivs & used_ivs
+        used_ivs |= ivs
+    
+    used_onlyonce_ivs = used_ivs - used_morethanonce_ivs
+      
+    subexprs_ordereddict = collections.OrderedDict()
         
-        used = False
-        
-        for _,e in ivs:
-            if sympy.sympify(e).has(s):
-              used = True
-              break
-        if not used:
-            for e in code[1]:
-              if sympy.sympify(e).has(s):
-                used = True
-                break
-        
-        if used:
-          ivs.append(code[0][i])
-          
-    return list(reversed(ivs)), code[1][:]
+    def _subexprs(expr):
+        subs = {}
+        for symb in expr.free_symbols:
+          if symb in subexprs_invdict and symb not in subexprs_ordereddict:
+              if symb in used_onlyonce_ivs:
+                  subexpr = subexprs_invdict[symb]
+                  new_expr = _subexprs(subexpr)
+                  subs[symb] = new_expr
+              else:
+                  subexpr = subexprs_invdict[symb]
+                  new_expr = _subexprs(subexpr)
+                  subexprs_ordereddict[symb] = new_expr
+
+        return expr.subs(subs)
+                  
+
+    out_exps = copy.deepcopy(code[1])
+    for i,expr in enumerate(out_exps):
+      out_exps[i] = _subexprs(expr)
+      
+    return (subexprs_ordereddict.items(), out_exps)
 
 
-def optim_cse( code, auxvarname = 'cse' ):
-    """Performe 'common sub-expression elimination' optimization on code."""
-
-    code_in = code
-    
-    if isinstance(code_in[1],sympy.Matrix):
-      code_in_exprs = sympy.flatten(code_in[1])
-    else:
-      code_in_exprs = code_in[1]
-
-    codecse = sympy.cse( sympy.sympify( [i[1] for i in code_in[0]] + code_in_exprs ), \
-                         sympy.cse_main.numbered_symbols(auxvarname) )
-    
-    auxv1_num = len(code_in[0])
-    
-    if auxv1_num == 0:
-        return codecse
-    
-    A1 = list(zip( list(zip(*code_in[0]))[0] , codecse[1][:auxv1_num] ))
-    Acse = codecse[0]
-    
-    def getdeps(expr,assignments):
-        out = []
-        search_assignments = copy.copy(assignments)
-        for assign in search_assignments:
-            if sympy.sympify(expr).has(assign[0]) and assign in assignments:
-                assignments.remove(assign)
-                out += getdeps(assign[1],assignments) + [assign]
-        return out
-    
-    codemerge = []
-    for a1 in A1:
-        codemerge += getdeps(a1[1],Acse)
-        codemerge.append( a1 )
-    for acse in Acse:
-        codemerge.append( acse )
-        
-    if isinstance(code_in[1],sympy.Matrix):
-      code_out_exprs = sympy.Matrix(codecse[1][auxv1_num:]).reshape(*code_in[1].shape)
-    else:
-      code_out_exprs = codecse[1][auxv1_num:]
-    
-    retcode = ( codemerge , code_out_exprs )
-    
-    return retcode
-
-
-def optim_cp( code ):
-    """Performe 'constant folding' and 'copy propagation' optimization on code."""
+def copy_propag( code ):
+    """Performe 'copy propagation' optimization on code."""
     
     debug = False
     removed=0
@@ -107,7 +79,7 @@ def optim_cp( code ):
       
        # constant folding
         v = retcode[0][i][0]
-        e = retcode[0][i][1].n()
+        e = retcode[0][i][1]
         retcode[0][i] = (v,e)
         
         # copy propagation
@@ -123,14 +95,70 @@ def optim_cp( code ):
         
     # output expression constant folding
     for i,e in enumerate(retcode[1]):
-      retcode[1][i] = e.n()
+      retcode[1][i] = e
     
     if debug: print('removed',removed)
     return retcode
 
 
-def optim_dce_sup( code ):
-    """Performe 'dead code elimination' and 'single use propagation' optimizations on code."""
+def constant_fold( code ):
+    """Performe 'constant folding' optimization on code."""
+    
+    retcode = ([], copy.deepcopy(code[1]))
+    
+    for v,e in code[0]:
+        retcode[0].append((v, e.n()))
+        
+    for i,e in enumerate(code[1]):
+        retcode[1][i] = e.n()
+    
+    return retcode
+  
+  
+
+def apply_func( code, func ):
+  sube = [None]*len(code[0])
+  oute = copy.deepcopy(code[1])
+  for (i,(v,e)) in enumerate(code[0]):
+    sube[i] = ( v, func(e) )
+  for i,e in enumerate(code[1]):
+    oute[i] = func(e)
+  return (sube, oute)
+
+
+def xreplace( code, xreplace_dict ):
+  return apply_func( code, lambda x: x.xreplace( xreplace_dict ) )
+
+
+def common_subexpr_elim( code, auxvarname = 'cse' ):
+    """Performe 'common sub-expression elimination' optimization on code."""
+    
+    se = subexprs.Subexprs()
+    se.subexprs_dict = {expr:ivar for ivar,expr in code[0]}
+    
+    if isinstance(code[1],sympy.Matrix):
+      code_out = sympy.flatten(code[1])
+    else:
+      code_out = code[1]
+    
+    cse = sympy.cse(se.subexprs_dict.keys() + code_out,  sympy.cse_main.numbered_symbols(auxvarname) )
+    
+    cse_new_subexprs = cse[0]
+    cse_subexprs = cse[1][:len(code[0])]
+    cse_outexprs = cse[1][len(code[0]):]
+    
+    se.subexprs_dict = dict(zip(cse_subexprs, se.subexprs_dict.values()))
+    se.subexprs_dict.update({expr:ivar for ivar,expr in cse_new_subexprs})
+    
+    new_code_out = copy.deepcopy(code[1])
+    for i,e in enumerate(cse_outexprs):
+      new_code_out[i] = e
+    
+    return (se.get_subexprs(new_code_out), new_code_out)
+    
+    
+def inlining( code ):
+    """Performe inlining of once used variables (and elimination of not used variables)."""
     
     debug = False
     removed=0
@@ -145,7 +173,7 @@ def optim_dce_sup( code ):
         usedin_oi = None
         if debug: print(i,v)
         for ai in range(i+1,len(retcode[0])):
-            count = sympy.sympify(retcode[0][ai][1]).has(v)
+            count = retcode[0][ai][1].count(v)
             if count:
                 uses += count
                 usedin_ai = ai
@@ -225,27 +253,37 @@ def make_output_single_vars(code, ivarnames=None ):
             cnt += 1
 
     return retcode
+  
 
 def _fprint(x):
   print(x)
   sys.stdout.flush()
 
+
 def fully_optimize_code( code, ivarnames=None, singlevarout=False, clearcache=0, debug = True ) :
   
-  if debug: _fprint(' dead code elimination and single use propagation')
-  code = optim_dce_sup(code)
+  if debug: _fprint(' dead code elimination and inlining of once used variables')
+  code = inlining(code)
   if clearcache > 1: sympy.cache.clear_cache()
   
-  if debug: _fprint(' common sub-expression elimination')
-  code = optim_cse(code,'cse')
+  if debug: _fprint(' copy propagation')
+  code = copy_propag(code,'cse')
   if clearcache > 1: sympy.cache.clear_cache()
   
-  if debug: _fprint(' constant folding and copy propagation')
-  code = optim_cp(code)
+  if debug: _fprint(' common subexpression elimination')
+  code = common_subexpr_elim(code,'cse')
   if clearcache > 1: sympy.cache.clear_cache()
   
-  if debug: _fprint(' dead code elimination and single use propagation')
-  code = optim_dce_sup(code)
+  if debug: _fprint(' dead code elimination and inlining of once used variables')
+  code = inlining(code)
+  if clearcache > 1: sympy.cache.clear_cache()
+  
+  if debug: _fprint(' copy propagation')
+  code = copy_propag(code,'cse')
+  if clearcache > 1: sympy.cache.clear_cache()
+  
+  if debug: _fprint(' constant folding')
+  code = constant_fold()(code)
   if clearcache > 1: sympy.cache.clear_cache()
   
   if ivarnames:
