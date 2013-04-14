@@ -133,6 +133,19 @@ def xreplace( code, xreplace_dict ):
 def common_subexpr_elim( code, auxvarname = 'cse' ):
     """Performe 'common sub-expression elimination' optimization on code."""
     
+    cse = sympy.cse([sympy.Eq(v,e) for v,e in code[0]] + list(code[1]), symbols=sympy.cse_main.numbered_symbols(auxvarname), postprocess=sympy.cse_main.cse_separate )
+        
+    new_code_out = copy.deepcopy(code[1])
+    for i,e in enumerate(cse[1]):
+      new_code_out[i] = e
+    
+    return (cse[0], new_code_out)
+    
+ 
+
+def common_subexpr_elim_OLD( code, auxvarname = 'cse' ):
+    """Performe 'common sub-expression elimination' optimization on code."""
+    
     se = subexprs.Subexprs()
     se.subexprs_dict = {expr:ivar for ivar,expr in code[0]}
     
