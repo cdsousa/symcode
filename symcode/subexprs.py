@@ -30,7 +30,7 @@ class Subexprs(object):
   
             
   def get_subexprs(self, out_exprs=None):
-    subexprs_invdict = {v:k for k,v in self.subexprs_dict.items()}
+    subexprs_invdict = {v:k for k,v in self.subexprs_dict.iteritems()}
     subexprs_ordereddict = collections.OrderedDict()
     def _subexprs(expr):
       for symb in expr.free_symbols:
