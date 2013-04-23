@@ -1,303 +1,6 @@
-
-import sympy
-import sympy.utilities
-
-import collections
-
-class Cse(object):
-       
-  def __init__(self, ivars_name='cse', opt_muladd=True):
-    
-    self._symbols = sympy.utilities.iterables.numbered_symbols(ivars_name, start=0, real=True)
-    
-    self._se_iv = dict()
-    
-    self.opt_muladd = opt_muladd
-    
-    self.muls_2a = dict()
-    self.muls_ma = dict()
-    self.adds_2a = dict()
-    self.adds_ma = dict()
-    
-     
-  def _parse(self, expr):
-    
-    if expr.is_Atom:
-      return expr
-      
-    else:
-      se = type(expr)(*map(self._parse, expr.args))
-        
-      if se in self._se_iv:
-        
-        return self._se_iv[se]
-      
-      else:
-        
-        
-        if self.opt_muladd and se.is_Mul:
-          
-          args = se.args
-          if len(args) == 2:
-            
-            new_ivar = next(self._symbols)
-            self._se_iv[se] = new_ivar
-            self.muls_2a[se] = new_ivar
-            
-            args_set = set(args)
-            seB_change = [seB for seB in self.muls_ma if len(args_set.intersection(set(seB.args))) == 2]
-            #print("%s=%s"%(new_ivar,se))
-            for seB in seB_change:
-              new_seB = seB.subs(se,new_ivar)
-              seB_ivar = self._se_iv.pop(seB)
-              self._se_iv[new_seB] = seB_ivar
-              self.muls_ma.pop(seB)
-              if len(new_seB.args) == 2: self.muls_2a[new_seB] = seB_ivar
-              else: self.muls_ma[new_seB] = seB_ivar
-              #print("  %s=%s  -->  %s=%s"%(seB_ivar,seB,self._se_iv[new_seB],new_seB))
-            
-            return new_ivar
-              
-              
-          else:
-            
-            args_set = set(args)     
-            
-            for seB in self.muls_2a:
-              if len(args_set.intersection(set(seB.args))) == 2:
-                se = se.subs( seB, self.muls_2a[seB] )
-                if se in self._se_iv:
-                  return self._se_iv[se]
-                elif len(se.args) == 2:
-                  new_ivar = next(self._symbols)
-                  self._se_iv[se] = new_ivar
-                  self.muls_2a[se] = new_ivar
-                  return new_ivar
-                else:
-                  return self._parse(se)
-                
-            for seB in self.muls_ma:
-              intersect = args_set.intersection(set(seB.args))
-              intersect_len = len(intersect)
-              if intersect_len >= 2:
-                intersect_se = sympy.Mul(*intersect)
-                if intersect_se == seB:
-                  intersect_ivar = self.muls_ma[seB]
-                else:
-                  intersect_ivar = next(self._symbols)
-                  self._se_iv[intersect_se] = intersect_ivar
-                  if intersect_len > 2:
-                    self.muls_ma[intersect_se] = intersect_ivar
-                  else:
-                    self.muls_2a[intersect_se] = intersect_ivar
-                  # new seB:
-                  seB_ivar = self._se_iv.pop(seB)
-                  self.muls_ma.pop(seB)
-                  new_seB = seB.subs(intersect_se,intersect_ivar)
-                  self._se_iv[new_seB] = seB_ivar
-                  if len(new_seB.args) > 2:
-                    self.muls_ma[new_seB] = seB_ivar
-                  else:
-                    self.muls_2a[new_seB] = seB_ivar
-                # new se
-                if intersect_se == se:
-                  return intersect_ivar
-                else:
-                  new_se = se.subs(intersect_se,intersect_ivar)
-                  if len(new_se.args) == 2:
-                    new_ivar = next(self._symbols)
-                    self._se_iv[new_se] = new_ivar
-                    self.muls_ma[new_se] = new_ivar
-                    return new_ivar
-                  else:
-                    #print('check symcode.subses.Subses._parse()')
-                    return self._parse(new_se)
-          
-            new_ivar = next(self._symbols)
-            self._se_iv[se] = new_ivar
-            self.muls_ma[se] = new_ivar
-            return new_ivar
-              
-            
-        elif self.opt_muladd and se.is_Add:
-          
-          args = se.args
-          if len(args) == 2:
-            
-            new_ivar = next(self._symbols)
-            self._se_iv[se] = new_ivar
-            self.adds_2a[se] = new_ivar
-            
-            args_set = set(args)
-            seB_change = [seB for seB in self.adds_ma if len(args_set.intersection(set(seB.args))) == 2]
-            #print("%s=%s"%(new_ivar,se))
-            for seB in seB_change:
-              new_seB = seB.subs(se,new_ivar)
-              seB_ivar = self._se_iv.pop(seB)
-              self._se_iv[new_seB] = seB_ivar
-              self.adds_ma.pop(seB)
-              if len(new_seB.args) == 2: self.adds_2a[new_seB] = seB_ivar
-              else: self.adds_ma[new_seB] = seB_ivar
-              #print("  %s=%s  -->  %s=%s"%(seB_ivar,seB,self._se_iv[new_seB],new_seB))
-            
-            return new_ivar
-              
-              
-          else:
-            
-            args_set = set(args)     
-            
-            for seB in self.adds_2a:
-              if len(args_set.intersection(set(seB.args))) == 2:
-                se = se.subs( seB, self.adds_2a[seB] )
-                if se in self._se_iv:
-                  return self._se_iv[se]
-                elif len(se.args) == 2:
-                  new_ivar = next(self._symbols)
-                  self._se_iv[se] = new_ivar
-                  self.adds_2a[se] = new_ivar
-                  return new_ivar
-                else:
-                  return self._parse(se)
-                
-            for seB in self.adds_ma:
-              intersect = args_set.intersection(set(seB.args))
-              intersect_len = len(intersect)
-              if intersect_len >= 2:
-                intersect_se = sympy.Add(*intersect)
-                if intersect_se == seB:
-                  intersect_ivar = self.adds_ma[seB]
-                else:
-                  intersect_ivar = next(self._symbols)
-                  self._se_iv[intersect_se] = intersect_ivar
-                  if intersect_len > 2:
-                    self.adds_ma[intersect_se] = intersect_ivar
-                  else:
-                    self.adds_2a[intersect_se] = intersect_ivar
-                  # new seB:
-                  seB_ivar = self._se_iv.pop(seB)
-                  self.adds_ma.pop(seB)
-                  new_seB = seB.subs(intersect_se,intersect_ivar)
-                  self._se_iv[new_seB] = seB_ivar
-                  if len(new_seB.args) > 2:
-                    self.adds_ma[new_seB] = seB_ivar
-                  else:
-                    self.adds_2a[new_seB] = seB_ivar
-                # new se
-                if intersect_se == se:
-                  return intersect_ivar
-                else:
-                  new_se = se.subs(intersect_se,intersect_ivar)
-                  if len(new_se.args) == 2:
-                    new_ivar = next(self._symbols)
-                    self._se_iv[new_se] = new_ivar
-                    self.adds_ma[new_se] = new_ivar
-                    return new_ivar
-                  else:
-                    return self._parse(new_se)
-          
-            new_ivar = next(self._symbols)
-            self._se_iv[se] = new_ivar
-            self.adds_ma[se] = new_ivar
-            return new_ivar
-              
-            
-        else:
-          new_ivar = next(self._symbols)
-          self._se_iv[se] = new_ivar
-          return new_ivar
-
-
-
-  def collect(self, exprs):
-    
-    if isinstance(exprs, sympy.Basic): # if only one expression is passed
-      exprs = [exprs]
-      is_single_expr = True
-    else:
-      is_single_expr = False
-    
-    out_exprs = map(self._parse, exprs)
-          
-    if is_single_expr:
-      return out_exprs[0]
-    elif isinstance(exprs, sympy.Matrix):
-      return sympy.Matrix(exprs.rows, exprs.cols, out_exprs)
-    else:
-      return out_exprs
-    
-  
-  
-  
-  def get(self, exprs=None):
-    
-    iv_se = {iv:se for se,iv in self._se_iv.iteritems()}
-    
-    if isinstance(exprs, sympy.Basic): # if only one expression is passed
-      exprs = [exprs]
-    elif exprs is None:
-      exprs = iv_se.keys()
-      
-    
-    used_ivs = set()
-    used_morethanonce_ivs = set()
-    
-    def _find_used_subexprs(subexpr):
-      if subexpr.is_Atom:
-        symbs = [subexpr]
-      else:
-        symbs = subexpr.args
-      for symb in symbs:
-        if symb in iv_se:
-          if symb not in used_ivs:
-            _find_used_subexprs(iv_se[symb])
-            used_ivs.add(symb)
-          else:
-            used_morethanonce_ivs.add(symb)
-            
-    for expr in exprs:
-      _find_used_subexprs(expr)
-
-
-    ordered_se_iv = collections.OrderedDict()
-        
-    def _get_subexprs(expr):
-        subs = dict()
-        for symb in expr.free_symbols:
-          if symb in iv_se and symb not in ordered_se_iv:
-              if symb in used_morethanonce_ivs:
-                  subexpr = iv_se[symb]
-                  new_expr = _get_subexprs(subexpr)
-                  ordered_se_iv[symb] = new_expr
-              else:
-                  subexpr = iv_se[symb]
-                  new_expr = _get_subexprs(subexpr)
-                  subs[symb] = new_expr
-        return expr.xreplace(subs)
-
-    out_exprs = [_get_subexprs(expr) for expr in exprs]
-    
-    
-    if isinstance(exprs, sympy.Matrix):
-      out_exprs = sympy.Matrix(exprs.rows, exprs.cols, out_exprs)
-    
-    return (ordered_se_iv.items(), out_exprs)
-
-
-
-def cse_c(exprs, ivars_name='cse', opt_muladd=True):
-  cse_obj = Cse(ivars_name, opt_muladd)
-  exprs = cse_obj.collect(exprs)
-  return cse_obj.get(exprs)
-
-
-
-
-
-
 """ Tools for doing common subexpression elimination.
 """
-import difflib
+from collections import OrderedDict
 
 from sympy.core import Basic, Mul, Add, sympify
 from sympy.core.basic import preorder_traversal
@@ -505,7 +208,7 @@ def _remove_singletons(reps, exprs):
     reps[:] = u_reps  # change happens in-place
 
 
-def cse_f(exprs, symbols=None, optimizations=None, postprocess=None):
+def cse(exprs, symbols=None, optimizations=None, postprocess=None):
     """ Perform common subexpression elimination on an expression.
 
     Parameters
@@ -536,12 +239,6 @@ def cse_f(exprs, symbols=None, optimizations=None, postprocess=None):
         The reduced expressions with all of the replacements above.
     """
     from sympy.matrices import Matrix
-    
-    _tmp_ivars = numbered_symbols('tmp')
-    _subexp_iv = dict()
-    _repeated = set()
-    _muls = set()
-    _adds = set()
 
     if symbols is None:
         symbols = numbered_symbols()
@@ -549,10 +246,10 @@ def cse_f(exprs, symbols=None, optimizations=None, postprocess=None):
         # In case we get passed an iterable with an __iter__ method instead of
         # an actual iterator.
         symbols = iter(symbols)
-    seen_subexp = set()
+    tmp_symbols = numbered_symbols('_csetmp')
+    subexp_iv = dict()
     muls = set()
     adds = set()
-    to_eliminate = set()
 
     if optimizations is None:
         # Pull out the default here just in case there are some weird
@@ -564,220 +261,200 @@ def cse_f(exprs, symbols=None, optimizations=None, postprocess=None):
         exprs = [exprs]
 
     # Preprocess the expressions to give us better optimization opportunities.
-    reduced_exprs = [preprocess_for_cse(e, optimizations) for e in exprs]
+    exprs = [preprocess_for_cse(e, optimizations) for e in exprs]
 
-
+    # Find all subexpressions.
     def _collect(expr):
-
-        if expr.is_Atom or iterable(expr):
+        
+        if expr.is_Atom:
             # Exclude atoms, since there is no point in renaming them.
+            return expr
+        
+        if iterable(expr):
             return expr
         
         subexpr = type(expr)(*map(_collect, expr.args))
 
-        if subexpr in _subexp_iv:
-            _repeated.add(subexpr)
-            return _subexp_iv[subexpr]
+        if subexpr in subexp_iv:
+            ivar = subexp_iv[subexpr]
+            return ivar
         
         if subexpr.is_Mul:
-            _muls.add(subexpr)
+            muls.add(subexpr)
         elif subexpr.is_Add:
-            _adds.add(subexpr)
+            adds.add(subexpr)
 
-        ivar = next(_tmp_ivars)
-        _subexp_iv[subexpr] = ivar
+        ivar = next(tmp_symbols)
+        subexp_iv[subexpr] = ivar
         
         return ivar
     
-    _tmp_exprs = list()
-    for expr in reduced_exprs:
+    tmp_exprs = list()
+    for expr in exprs:
         if isinstance(expr, Basic):
-            _tmp_exprs.append(_collect(expr))
+            tmp_exprs.append(_collect(expr))
         else:
-            _tmp_exprs.append(expr)
-    
-    # Find all of the repeated subexpressions.
-    for expr in reduced_exprs:
-        if not isinstance(expr, Basic):
-            continue
-        pt = preorder_traversal(expr)
-        for subtree in pt:
-
-            inv = 1/subtree if subtree.is_Pow else None
-
-            if subtree.is_Atom or iterable(subtree) or inv and inv.is_Atom:
-                # Exclude atoms, since there is no point in renaming them.
-                continue
-
-            if subtree in seen_subexp:
-                if inv and _coeff_isneg(subtree.exp):
-                    # save the form with positive exponent
-                    subtree = inv
-                to_eliminate.add(subtree)
-                pt.skip()
-                continue
-
-            if inv and inv in seen_subexp:
-                if _coeff_isneg(subtree.exp):
-                    # save the form with positive exponent
-                    subtree = inv
-                to_eliminate.add(subtree)
-                pt.skip()
-                continue
-            elif subtree.is_Mul:
-                muls.add(subtree)
-            elif subtree.is_Add:
-                adds.add(subtree)
-
-            seen_subexp.add(subtree)
-    
-    _adds = [set(a.args) for a in ordered(_adds)]
-    for i in xrange(len(_adds)):
-        for j in xrange(i + 1, len(_adds)):
-            com = _adds[i].intersection(_adds[j])
-            if len(com) > 1:
-                
-                subadd = Add(*com)
-                _repeated.add(subadd) 
-                
-                diff_add_i = _adds[i].difference(com)
-                diff_add_j = _adds[j].difference(com)
-                
-                if subadd in _subexp_iv:
-                    ivar = _subexp_iv[subadd]
-                else:
-                    ivar = next(_tmp_ivars)
-                    
-                if diff_add_i:
-                    _subexp_iv[Add(ivar,*diff_add_i)] = _subexp_iv.pop(Add(*_adds[i]))
-                #else add_i is itself _subexp_iv[subadd] -> ivar
-                
-                if diff_add_j:
-                    _subexp_iv[Add(ivar,*diff_add_j)] = _subexp_iv.pop(Add(*_adds[j]))
-                #else add_j is itself _subexp_iv[subadd] -> ivar
-                        
-                _adds[i] = diff_add_i
-                _adds[j] = diff_add_j
-                
-                for k in xrange(j + 1, len(_adds)):
-                    if com.issubset(_adds[k]):
-                        
-                        diff_add_k = _adds[k].difference(com)
-                        
-                        if diff_add_k:
-                            _subexp_iv[Add(ivar,*diff_add_k)] = _subexp_iv.pop(Add(*_adds[k]))
-                        #else add_k is itself _subexp_iv[subadd] -> ivar
-                        
-                        _adds[k] = diff_add_k
-    
-    
+            tmp_exprs.append(expr)
     
     # process adds - any adds that weren't repeated might contain
     # subpatterns that are repeated, e.g. x+y+z and x+y have x+y in common
-    adds = [set(a.args) for a in ordered(adds)]
-    for i in xrange(len(adds)):
-        for j in xrange(i + 1, len(adds)):
-            com = adds[i].intersection(adds[j])
+    adds = list(ordered(adds))
+    addargs = [set(a.args) for a in adds]
+    for i in xrange(len(addargs)):
+        for j in xrange(i + 1, len(addargs)):
+            com = addargs[i].intersection(addargs[j])
             if len(com) > 1:
-                to_eliminate.add(Add(*com))
-
-                # remove this set of symbols so it doesn't appear again
-                adds[i] = adds[i].difference(com)
-                adds[j] = adds[j].difference(com)
-                for k in xrange(j + 1, len(adds)):
-                    if not com.difference(adds[k]):
-                        adds[k] = adds[k].difference(com)
+                
+                add_subexp = Add(*com)
+                
+                diff_add_i = addargs[i].difference(com)
+                diff_add_j = addargs[j].difference(com)
+                
+                if add_subexp in subexp_iv:
+                    ivar = subexp_iv[add_subexp]
+                else:
+                    ivar = next(tmp_symbols)
+                    subexp_iv[add_subexp] = ivar
+                    
+                if diff_add_i:
+                    newadd = Add(ivar,*diff_add_i)
+                    subexp_iv[newadd] = subexp_iv.pop(adds[i])
+                    adds[i] = newadd
+                #else add_i is itself subexp_iv[add_subexp] -> ivar
+                
+                if diff_add_j:
+                    newadd = Add(ivar,*diff_add_j)
+                    subexp_iv[newadd] = subexp_iv.pop(adds[j])
+                    adds[j] = newadd
+                #else add_j is itself subexp_iv[add_subexp] -> ivar
+                        
+                addargs[i] = diff_add_i
+                addargs[j] = diff_add_j
+                
+                for k in xrange(j + 1, len(addargs)):
+                    if com.issubset(addargs[k]):
+                        
+                        diff_add_k = addargs[k].difference(com)
+                        
+                        if diff_add_k:
+                            newadd = Add(ivar,*diff_add_k)
+                            subexp_iv[newadd] = subexp_iv.pop(adds[k])
+                            adds[k] = newadd
+                        #else add_k is itself subexp_iv[add_subexp] -> ivar
+                        
+                        addargs[k] = diff_add_k
 
     # process muls - any muls that weren't repeated might contain
     # subpatterns that are repeated, e.g. x*y*z and x*y have x*y in common
-
-    # use SequenceMatcher on the nc part to find the longest common expression
-    # in common between the two nc parts
-    sm = difflib.SequenceMatcher()
-
-    muls = [a.args_cnc(cset=True) for a in ordered(muls)]
-    for i in xrange(len(muls)):
-        if muls[i][1]:
-            sm.set_seq1(muls[i][1])
-        for j in xrange(i + 1, len(muls)):
-            # the commutative part in common
-            ccom = muls[i][0].intersection(muls[j][0])
-
-            # the non-commutative part in common
-            if muls[i][1] and muls[j][1]:
-                # see if there is any chance of an nc match
-                ncom = set(muls[i][1]).intersection(set(muls[j][1]))
-                if len(ccom) + len(ncom) < 2:
-                    continue
-
-                # now work harder to find the match
-                sm.set_seq2(muls[j][1])
-                i1, _, n = sm.find_longest_match(0, len(muls[i][1]),
-                                                 0, len(muls[j][1]))
-                ncom = muls[i][1][i1:i1 + n]
-            else:
-                ncom = []
-
-            com = list(ccom) + ncom
-            if len(com) < 2:
-                continue
-
-            to_eliminate.add(Mul(*com))
-
-            # remove ccom from all if there was no ncom; to update the nc part
-            # would require finding the subexpr and then replacing it with a
-            # dummy to keep bounding nc symbols from being identified as a
-            # subexpr, e.g. removing B*C from A*B*C*D might allow A*D to be
-            # identified as a subexpr which would not be right.
-            if not ncom:
-                muls[i][0] = muls[i][0].difference(ccom)
-                for k in xrange(j, len(muls)):
-                    if not ccom.difference(muls[k][0]):
-                        muls[k][0] = muls[k][0].difference(ccom)
-
-    # make to_eliminate canonical; we will prefer non-Muls to Muls
-    # so select them first (non-Muls will have False for is_Mul and will
-    # be first in the ordering.
-    to_eliminate = list(ordered(to_eliminate, lambda _: _.is_Mul))
-
-    # Substitute symbols for all of the repeated subexpressions.
-    replacements = []
-    reduced_exprs = list(reduced_exprs)
-    hit = True
-    for i, subtree in enumerate(to_eliminate):
-        if hit:
-            sym = symbols.next()
-        hit = False
-        if subtree.is_Pow and subtree.exp.is_Rational:
-            update = lambda x: x.xreplace({subtree: sym, 1/subtree: 1/sym})
+    # *assumes that there are no non-commutative parts*
+    muls = list(ordered(muls))
+    mulargs = [set(a.args) for a in muls]
+    for i in xrange(len(mulargs)):
+        for j in xrange(i + 1, len(mulargs)):
+            com = mulargs[i].intersection(mulargs[j])
+            if len(com) > 1:
+                
+                mul_subexp = Mul(*com)
+                
+                diff_mul_i = mulargs[i].difference(com)
+                diff_mul_j = mulargs[j].difference(com)
+                
+                if mul_subexp in subexp_iv:
+                    ivar = subexp_iv[mul_subexp]
+                else:
+                    ivar = next(tmp_symbols)
+                    subexp_iv[mul_subexp] = ivar
+                    
+                if diff_mul_i:
+                    newmul = Mul(ivar,*diff_mul_i)
+                    subexp_iv[newmul] = subexp_iv.pop(muls[i])
+                    muls[i] = newmul
+                #else mul_i is itself subexp_iv[mul_subexp] -> ivar
+                
+                if diff_mul_j:
+                    newmul = Mul(ivar,*diff_mul_j)
+                    subexp_iv[newmul] = subexp_iv.pop(muls[j])
+                    muls[j] = newmul
+                #else mul_j is itself subexp_iv[mul_subexp] -> ivar
+                        
+                mulargs[i] = diff_mul_i
+                mulargs[j] = diff_mul_j
+                
+                for k in xrange(j + 1, len(mulargs)):
+                    if com.issubset(mulargs[k]):
+                        
+                        diff_mul_k = mulargs[k].difference(com)
+                        
+                        if diff_mul_k:
+                            newmul = Mul(ivar,*diff_mul_k)
+                            subexp_iv[newmul] = subexp_iv.pop(muls[k])
+                            muls[k] = newmul
+                        #else mul_k is itself subexp_iv[mul_subexp] -> ivar
+                        
+                        mulargs[k] = diff_mul_k
+    
+    # Find all of the repeated subexpressions.
+    
+    ivar_se = {iv:se for se,iv in subexp_iv.iteritems()}
+    
+    used_ivs = set()
+    repeated = set()
+    
+    def _find_repeated_subexprs(subexpr):
+        if subexpr.is_Atom:
+            symbs = [subexpr]
         else:
-            update = lambda x: x.subs(subtree, sym)
-        # Make the substitution in all of the target expressions.
-        for j, expr in enumerate(reduced_exprs):
-            old = reduced_exprs[j]
-            reduced_exprs[j] = update(expr)
-            hit = hit or (old != reduced_exprs[j])
-        # Make the substitution in all of the subsequent substitutions.
-        for j in range(i + 1, len(to_eliminate)):
-            old = to_eliminate[j]
-            to_eliminate[j] = update(to_eliminate[j])
-            hit = hit or (old != to_eliminate[j])
-        if hit:
-            replacements.append((sym, subtree))
+            symbs = subexpr.args
+        for symb in symbs:
+            if symb in ivar_se:
+                if symb not in used_ivs:
+                    _find_repeated_subexprs(ivar_se[symb])
+                    used_ivs.add(symb)
+                else:
+                    repeated.add(symb)
+    
+    for expr in tmp_exprs:
+        _find_repeated_subexprs(expr)
+        
+    # Substitute symbols for all of the repeated subexpressions.
+    # remove temporary replacements that weren't used more than once
+    
+    tmpivs_ivs = dict()
+    ordered_se_iv = OrderedDict()
+    
+    def _get_subexprs(args):
+        args = list(args)
+        for i,symb in enumerate(args):
+            if symb in ivar_se:
+                if symb in tmpivs_ivs:
+                    args[i] = tmpivs_ivs[symb]
+                else:
+                    subexpr = ivar_se[symb]
+                    subexpr = type(subexpr)(*_get_subexprs(subexpr.args))
+                    if symb in repeated:
+                        ivar = next(symbols)
+                        ordered_se_iv[ivar] = subexpr
+                        tmpivs_ivs[symb] = ivar
+                        args[i] = ivar
+                    else:
+                        args[i] = subexpr
+        return args
 
+    out_exprs = _get_subexprs(tmp_exprs)    
+    
+    
+            
     # Postprocess the expressions to return the expressions to canonical form.
-    for i, (sym, subtree) in enumerate(replacements):
-        subtree = postprocess_for_cse(subtree, optimizations)
-        replacements[i] = (sym, subtree)
-    reduced_exprs = [postprocess_for_cse(e, optimizations)
-        for e in reduced_exprs]
-
-    # remove replacements that weren't used more than once
-    _remove_singletons(replacements, reduced_exprs)
+    ordered_se_iv_notopt = ordered_se_iv
+    ordered_se_iv = OrderedDict()
+    for i, (subexpr, ivar) in enumerate(ordered_se_iv_notopt.items()):
+        subexpr = postprocess_for_cse(subexpr, optimizations)
+        ordered_se_iv[subexpr] = ivar
+    out_exprs = [postprocess_for_cse(e, optimizations) for e in out_exprs]
 
     if isinstance(exprs, Matrix):
-        reduced_exprs = [Matrix(exprs.rows, exprs.cols, reduced_exprs)]
+        out_exprs = Matrix(exprs.rows, exprs.cols, out_exprs)
     if postprocess is None:
-        return replacements, reduced_exprs
-    return postprocess(replacements, reduced_exprs)
+        return ordered_se_iv.items(), out_exprs
+    return postprocess(ordered_se_iv.items(), out_exprs)
 
