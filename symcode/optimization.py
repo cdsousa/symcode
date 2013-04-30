@@ -11,7 +11,7 @@ def dead_code_elim( code ):
     """Performe 'dead code elimination' optimization on code."""
     
     se = subexprs.Subexprs()
-    se.subexprs_dict = {v:k for k, v in dict(code[0]).items()}
+    se._subexp_iv = {v:k for k, v in code[0]}
     return (se.get_subexprs(code[1]), copy.deepcopy(code[1]))
 
 

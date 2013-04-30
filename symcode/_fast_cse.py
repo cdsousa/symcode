@@ -261,10 +261,10 @@ def cse(exprs, symbols=None, optimizations=None, postprocess=None):
         exprs = [exprs]
 
     # Preprocess the expressions to give us better optimization opportunities.
-    exprs = [preprocess_for_cse(e, optimizations) for e in exprs]
+    prep_exprs = [preprocess_for_cse(e, optimizations) for e in exprs]
 
     # Find all subexpressions.
-    def _collect(expr):
+    def _parse(expr):
         
         if expr.is_Atom:
             # Exclude atoms, since there is no point in renaming them.
@@ -273,11 +273,10 @@ def cse(exprs, symbols=None, optimizations=None, postprocess=None):
         if iterable(expr):
             return expr
         
-        subexpr = type(expr)(*map(_collect, expr.args))
+        subexpr = type(expr)(*map(_parse, expr.args))
 
         if subexpr in subexp_iv:
-            ivar = subexp_iv[subexpr]
-            return ivar
+            return subexp_iv[subexpr]
         
         if subexpr.is_Mul:
             muls.add(subexpr)
@@ -290,9 +289,9 @@ def cse(exprs, symbols=None, optimizations=None, postprocess=None):
         return ivar
     
     tmp_exprs = list()
-    for expr in exprs:
+    for expr in prep_exprs:
         if isinstance(expr, Basic):
-            tmp_exprs.append(_collect(expr))
+            tmp_exprs.append(_parse(expr))
         else:
             tmp_exprs.append(expr)
     
