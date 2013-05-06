@@ -19,8 +19,127 @@ class Subexprs(object):
         self._tmp_symbols = sympy.utilities.iterables.numbered_symbols('tmp', start=0, real=True)
         
         self._subexp_iv = dict()
-        self._muls = set()
-        self._adds = set()
+        self._muls = list()
+        self._adds = list()
+        
+        
+    def _parse_mul(self, mul):
+            
+        mulA = set(mul.args)
+            
+        for i, mulB in enumerate(self._muls):
+            
+            com = mulA.intersection(mulB)
+            if len(com) > 1:
+                
+                diff_mulA = mulA.difference(com)
+                diff_mulB = mulB.difference(com)
+                
+                if not diff_mulA: # mulA is strict subset of mulB
+                    
+                    ivar = next(self._tmp_symbols)
+                    self._subexp_iv[sympy.Mul(*mulA)] = ivar
+                    self._muls.append(mulA)
+                    
+                    mulB = diff_mulB
+                    mulB.add(ivar)
+                    self._subexp_iv[sympy.Mul(*mulB)] = self._subexp_iv.pop(sympy.Mul(*self._muls[i]))
+                    self._muls[i] = mulB
+                    
+                    return ivar
+                
+                elif not diff_mulB: # mulB is strict subset of mulA
+                    
+                    mulA = diff_mulA
+                    mulA.add(self._subexp_iv[sympy.Mul(*mulB)])
+                    
+                    ivar = self._subexp_iv.get(sympy.Mul(*mulA), None)
+                    if ivar:
+                        return ivar
+                    
+                    if len(mulA) == 2:
+                        break
+                
+                else: # mulA != com != mulB
+                    
+                    ivar = next(self._tmp_symbols)
+                    self._subexp_iv[sympy.Mul(*com)] = ivar
+                    self._muls.append(com)
+                    
+                    mulB = diff_mulB
+                    mulB.add(ivar)
+                    self._subexp_iv[sympy.Mul(*mulB)] = self._subexp_iv.pop(sympy.Mul(*self._muls[i]))
+                    self._muls[i] = mulB
+                    
+                    mulA = diff_mulA
+                    mulA.add(ivar)
+                    if len(mulA) == 2:
+                        break
+        
+        ivar = next(self._tmp_symbols)
+        self._subexp_iv[sympy.Mul(*mulA)] = ivar
+        self._muls.append(mulA)
+        
+        return ivar
+    
+    def _parse_add(self, add):
+            
+        addA = set(add.args)
+            
+        for i, addB in enumerate(self._adds):
+            
+            com = addA.intersection(addB)
+            if len(com) > 1:
+                
+                diff_addA = addA.difference(com)
+                diff_addB = addB.difference(com)
+                
+                if not diff_addA: # addA is strict subset of addB
+                    
+                    ivar = next(self._tmp_symbols)
+                    self._subexp_iv[sympy.Add(*addA)] = ivar
+                    self._adds.append(addA)
+                    
+                    addB = diff_addB
+                    addB.add(ivar)
+                    self._subexp_iv[sympy.Add(*addB)] = self._subexp_iv.pop(sympy.Add(*self._adds[i]))
+                    self._adds[i] = addB
+                    
+                    return ivar
+                
+                elif not diff_addB: # addB is strict subset of addA
+                    
+                    addA = diff_addA
+                    addA.add(self._subexp_iv[sympy.Add(*addB)])
+                    
+                    ivar = self._subexp_iv.get(sympy.Add(*addA), None)
+                    if ivar:
+                        return ivar
+                    
+                    if len(addA) == 2:
+                        break
+                
+                else: # addA != com != addB
+                    
+                    ivar = next(self._tmp_symbols)
+                    self._subexp_iv[sympy.Add(*com)] = ivar
+                    self._adds.append(com)
+                    
+                    addB = diff_addB
+                    addB.add(ivar)
+                    self._subexp_iv[sympy.Add(*addB)] = self._subexp_iv.pop(sympy.Add(*self._adds[i]))
+                    self._adds[i] = addB
+                    
+                    addA = diff_addA
+                    addA.add(ivar)
+                    if len(addA) == 2:
+                        break
+        
+        ivar = next(self._tmp_symbols)
+        self._subexp_iv[sympy.Add(*addA)] = ivar
+        self._adds.append(addA)
+        
+        return ivar
         
     
     def _parse(self, expr):
@@ -38,14 +157,13 @@ class Subexprs(object):
             return self._subexp_iv[subexpr]
         
         if subexpr.is_Mul:
-            self._muls.add(subexpr)
+            return self._parse_mul(subexpr)
         elif subexpr.is_Add:
-            self._adds.add(subexpr)
-
-        ivar = next(self._tmp_symbols)
-        self._subexp_iv[subexpr] = ivar
-        
-        return ivar
+            return self._parse_add(subexpr)
+        else:
+            ivar = next(self._tmp_symbols)
+            self._subexp_iv[subexpr] = ivar
+            return ivar
 
 
     def collect(self, exprs):
@@ -69,119 +187,6 @@ class Subexprs(object):
             return out_exprs
         
     
-    
-    def _process_adss_and_muls(self):
-        
-        # process adds - any adds that weren't repeated might contain
-        # subpatterns that are repeated, e.g. x+y+z and x+y have x+y in common
-        adds = list(sympy.ordered(self._adds))
-        addargs = [set(a.args) for a in adds]
-        for i in xrange(len(addargs)):
-            for j in xrange(i + 1, len(addargs)):
-                com = addargs[i].intersection(addargs[j])
-                if len(com) > 1:
-                    
-                    add_subexp = sympy.Add(*com)
-                    
-                    diff_add_i = addargs[i].difference(com)
-                    diff_add_j = addargs[j].difference(com)
-                    
-                    if add_subexp in self._subexp_iv:
-                        ivar = self._subexp_iv[add_subexp]
-                    else:
-                        ivar = next(self._tmp_symbols)
-                        self._subexp_iv[add_subexp] = ivar
-                        
-                    if diff_add_i:
-                        newadd = sympy.Add(ivar,*diff_add_i)
-                        self._subexp_iv[newadd] = self._subexp_iv.pop(adds[i])
-                        self._adds.remove(adds[i])
-                        self._adds.add(newadd)
-                        adds[i] = newadd
-                    #else add_i is itself self._subexp_iv[add_subexp] -> ivar
-                    
-                    if diff_add_j:
-                        newadd = sympy.Add(ivar,*diff_add_j)
-                        self._subexp_iv[newadd] = self._subexp_iv.pop(adds[j])
-                        self._adds.remove(adds[j])
-                        self._adds.add(newadd)
-                        adds[j] = newadd
-                    #else add_j is itself self._subexp_iv[add_subexp] -> ivar
-                            
-                    addargs[i] = diff_add_i
-                    addargs[j] = diff_add_j
-                    
-                    for k in xrange(j + 1, len(addargs)):
-                        if com.issubset(addargs[k]):
-                            
-                            diff_add_k = addargs[k].difference(com)
-                            
-                            if diff_add_k:
-                                newadd = sympy.Add(ivar,*diff_add_k)
-                                self._subexp_iv[newadd] = self._subexp_iv.pop(adds[k])
-                                self._adds.remove(adds[k])
-                                self._adds.add(newadd)
-                                adds[k] = newadd
-                            #else add_k is itself self._subexp_iv[add_subexp] -> ivar
-                            
-                            addargs[k] = diff_add_k
-
-        # process muls - any muls that weren't repeated might contain
-        # subpatterns that are repeated, e.g. x*y*z and x*y have x*y in common
-        # *assumes that there are no non-commutative parts*
-        muls = list(sympy.ordered(self._muls))
-        mulargs = [set(a.args) for a in muls]
-        for i in xrange(len(mulargs)):
-            for j in xrange(i + 1, len(mulargs)):
-                com = mulargs[i].intersection(mulargs[j])
-                if len(com) > 1:
-                    
-                    mul_subexp = sympy.Mul(*com)
-                    
-                    diff_mul_i = mulargs[i].difference(com)
-                    diff_mul_j = mulargs[j].difference(com)
-                    
-                    if mul_subexp in self._subexp_iv:
-                        ivar = self._subexp_iv[mul_subexp]
-                    else:
-                        ivar = next(self._tmp_symbols)
-                        self._subexp_iv[mul_subexp] = ivar
-                        
-                    if diff_mul_i:
-                        newmul = sympy.Mul(ivar,*diff_mul_i)
-                        self._subexp_iv[newmul] = self._subexp_iv.pop(muls[i])
-                        self._muls.remove(muls[i])
-                        self._muls.add(newmul)
-                        muls[i] = newmul
-                    #else mul_i is itself self._subexp_iv[mul_subexp] -> ivar
-                    
-                    if diff_mul_j:
-                        newmul = sympy.Mul(ivar,*diff_mul_j)
-                        self._subexp_iv[newmul] = self._subexp_iv.pop(muls[j])
-                        self._muls.remove(muls[j])
-                        self._muls.add(newmul)
-                        muls[j] = newmul
-                    #else mul_j is itself self._subexp_iv[mul_subexp] -> ivar
-                            
-                    mulargs[i] = diff_mul_i
-                    mulargs[j] = diff_mul_j
-                    
-                    for k in xrange(j + 1, len(mulargs)):
-                        if com.issubset(mulargs[k]):
-                            
-                            diff_mul_k = mulargs[k].difference(com)
-                            
-                            if diff_mul_k:
-                                newmul = sympy.Mul(ivar,*diff_mul_k)
-                                self._subexp_iv[newmul] = self._subexp_iv.pop(muls[k])
-                                self._muls.remove(muls[k])
-                                self._muls.add(newmul)
-                                muls[k] = newmul
-                            #else mul_k is itself self._subexp_iv[mul_subexp] -> ivar
-                            
-                            mulargs[k] = diff_mul_k
-                            
-
     def get(self, exprs=None, symbols=None):
         
         if symbols is None:
@@ -191,7 +196,7 @@ class Subexprs(object):
             # an actual iterator.
             symbols = iter(symbols)
         
-        self._process_adss_and_muls()
+        #self._process_adds_and_muls()
         
         # Find all of the repeated subexpressions.
         
