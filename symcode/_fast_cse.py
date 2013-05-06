@@ -419,7 +419,7 @@ def cse(exprs, symbols=None, optimizations=None, postprocess=None):
     # remove temporary replacements that weren't used more than once
     
     tmpivs_ivs = dict()
-    ordered_se_iv = OrderedDict()
+    ordered_iv_se = OrderedDict()
     
     def _get_subexprs(args):
         args = list(args)
@@ -432,7 +432,7 @@ def cse(exprs, symbols=None, optimizations=None, postprocess=None):
                     subexpr = type(subexpr)(*_get_subexprs(subexpr.args))
                     if symb in repeated:
                         ivar = next(symbols)
-                        ordered_se_iv[ivar] = subexpr
+                        ordered_iv_se[ivar] = subexpr
                         tmpivs_ivs[symb] = ivar
                         args[i] = ivar
                     else:
@@ -444,16 +444,16 @@ def cse(exprs, symbols=None, optimizations=None, postprocess=None):
     
             
     # Postprocess the expressions to return the expressions to canonical form.
-    ordered_se_iv_notopt = ordered_se_iv
-    ordered_se_iv = OrderedDict()
-    for i, (subexpr, ivar) in enumerate(ordered_se_iv_notopt.items()):
+    ordered_iv_se_notopt = ordered_iv_se
+    ordered_iv_se = OrderedDict()
+    for i, (ivar, subexpr) in enumerate(ordered_iv_se_notopt.items()):
         subexpr = postprocess_for_cse(subexpr, optimizations)
-        ordered_se_iv[subexpr] = ivar
+        ordered_iv_se[ivar] = subexpr
     out_exprs = [postprocess_for_cse(e, optimizations) for e in out_exprs]
 
     if isinstance(exprs, Matrix):
         out_exprs = Matrix(exprs.rows, exprs.cols, out_exprs)
     if postprocess is None:
-        return ordered_se_iv.items(), out_exprs
-    return postprocess(ordered_se_iv.items(), out_exprs)
+        return ordered_iv_se.items(), out_exprs
+    return postprocess(ordered_iv_se.items(), out_exprs)
 
