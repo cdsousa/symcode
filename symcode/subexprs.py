@@ -22,21 +22,50 @@ class Subexprs(object):
         self._commutatives = dict()
         
         
+    class _ordered_len(object):
+        def __init__(self):
+            self.lenidxs = [0]
+        def insert(self, list, item):
+            l = len(item)
+            over = l - (len(self.lenidxs) - 1)
+            if over > 0:
+                self.lenidxs.extend([self.lenidxs[-1]]*over)
+            list.insert(self.lenidxs[l], item)
+            for j in range(l,len(self.lenidxs)):
+                self.lenidxs[j] += 1
+        def pop(self, list, index):
+            l = len(list.pop(index))
+            for j in range(l,len(self.lenidxs)):
+                self.lenidxs[j] -= 1
+            
     def _parse_commutative(self, expr):
         
         exprtype = type(expr)
-        
         args_input = set(expr.args)
         
         if exprtype not in self._commutatives:
-            self._commutatives[exprtype] = [set(expr.args)]
+            argsets = []
+            argset_orderlens = self._ordered_len()
+            argset_orderlens.insert(argsets, args_input)
+            self._commutatives[exprtype] = (argsets, argset_orderlens)
             ivar = next(self._tmp_symbols)
             self._subexp_iv[expr] = ivar
-            return ivar            
+            return ivar      
+        
+        argsets = self._commutatives[exprtype][0]
+        argset_orderlens = self._commutatives[exprtype][1]
+        
+        ivar = None
+        args_to_substitute = []
+        args_to_insert = []
+        
+        if len(args_input) == 2:
+            init = argset_orderlens.lenidxs[2]
+        else:
+            init = 0
             
-        argsets = self._commutatives[exprtype]
-            
-        for i, args_other in enumerate(argsets):
+        for i in range(init, len(argsets)):
+            args_other = argsets[i]
             
             com = args_input.intersection(args_other)
             if len(com) > 1:
@@ -48,14 +77,14 @@ class Subexprs(object):
                     
                     ivar = next(self._tmp_symbols)
                     self._subexp_iv[exprtype(*args_input)] = ivar
-                    argsets.append(args_input)
+                    args_to_insert.append(args_input)
                     
                     args_other = diff_args_other
                     args_other.add(ivar)
                     self._subexp_iv[exprtype(*args_other)] = self._subexp_iv.pop(exprtype(*argsets[i]))
-                    argsets[i] = args_other
+                    args_to_substitute.append((i, args_other))
                     
-                    return ivar
+                    break
                 
                 elif not diff_args_other: # args_other is strict subset of args_input
                     
@@ -63,31 +92,38 @@ class Subexprs(object):
                     args_input.add(self._subexp_iv[exprtype(*args_other)])
                     
                     ivar = self._subexp_iv.get(exprtype(*args_input), None)
-                    if ivar:
-                        return ivar
                     
-                    if len(args_input) == 2:
+                    if ivar or len(args_input) == 2:
                         break
                 
                 else: # args_input != com != args_other
                     
-                    ivar = next(self._tmp_symbols)
-                    self._subexp_iv[exprtype(*com)] = ivar
-                    argsets.append(com)
+                    ivar_com = next(self._tmp_symbols)
+                    self._subexp_iv[exprtype(*com)] = ivar_com
+                    args_to_insert.append(com) #argsets.append(com)
                     
                     args_other = diff_args_other
-                    args_other.add(ivar)
+                    args_other.add(ivar_com)
                     self._subexp_iv[exprtype(*args_other)] = self._subexp_iv.pop(exprtype(*argsets[i]))
-                    argsets[i] = args_other
+                    args_to_substitute.append((i, args_other))
                     
                     args_input = diff_args_input
-                    args_input.add(ivar)
+                    args_input.add(ivar_com)
+                    
                     if len(args_input) == 2:
                         break
         
-        ivar = next(self._tmp_symbols)
-        self._subexp_iv[exprtype(*args_input)] = ivar
-        argsets.append(args_input)
+        if ivar is None:
+            ivar = next(self._tmp_symbols)
+            self._subexp_iv[exprtype(*args_input)] = ivar
+            args_to_insert.append(args_input)
+        
+        for i, args in args_to_substitute:
+            argset_orderlens.pop(argsets, i)
+            args_to_insert.append(args)
+        for args in args_to_insert:
+            argset_orderlens.insert(argsets, args)
+        
         return ivar
         
     def _parse(self, expr):
