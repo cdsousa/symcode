@@ -116,14 +116,13 @@ def constant_fold( code ):
   
   
 
-def apply_func( code, func ):
-  sube = [None]*len(code[0])
-  oute = copy.deepcopy(code[1])
-  for (i,(v,e)) in enumerate(code[0]):
-    sube[i] = ( v, func(e) )
-  for i,e in enumerate(code[1]):
-    oute[i] = func(e)
-  return (sube, oute)
+def apply_func( code, func, apply_to_ivs=True ):
+    if apply_to_ivs:
+        code_ivs = [(func(iv), func(se)) for iv, se in code[0]]
+    else:
+        code_ivs = [(iv, func(se)) for iv, se in code[0]]
+    code_exprs = [func(expr) for expr in code[1]]
+    return code_ivs, code_exprs
 
 
 def xreplace( code, xreplace_dict ):

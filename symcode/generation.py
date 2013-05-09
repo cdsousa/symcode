@@ -5,6 +5,7 @@ import sympy
 import sys
 import re
 
+from . import optimization
 
 options = {}
 options['unroll_square'] = True
@@ -69,7 +70,7 @@ def codestring_count( codestring, resume=False ):
     return ops, {'add':adds, 'mul':muls, 'total':adds+muls }
 
 
-def gen_py_func( code, func_parms, subs_pairs, func_name='func', outvar_name='out' ):
+def gen_py_func( code, func_parms, func_name='func', outvar_name='out' ):
 
     indent = 4*' '
 
@@ -84,28 +85,27 @@ def gen_py_func( code, func_parms, subs_pairs, func_name='func', outvar_name='ou
     pycode += indent + outvar_name + ' = [0]*' + str( len(code[1]) ) + '\n\n'
 
     mainpycode = code_to_string( code, outvar_name, indent )
-    for (old,new) in subs_pairs: mainpycode = mainpycode.replace(old,new)
+    
     pycode += mainpycode
 
     pycode += '\n' + indent + 'return ' + outvar_name + '\n'
     return pycode
 
-def gen_c_func( code, func_parms, subs_pairs, func_name='func', outvar_name='out' ):
-
+def gen_c_func( code, func_parms, func_name='func', outvar_name='out' ):
+    
     indent = 2*' '
 
     ccode = 'void ' + func_name + '( double* ' + outvar_name
     for parm in func_parms :
         ccode += ', const double* ' + parm
     ccode += ' )\n{\n'
-
+    
     mainccode = code_to_string( code, outvar_name, indent, 'double', ';' )
-    for (old,new) in subs_pairs: mainccode = mainccode.replace(old,new)
 
     ccode += mainccode + '\n'+indent+'return;\n}\n'
     return ccode
 
-def gen_pyx_func( code, func_parms, subs_pairs, func_name='func', outvar_name='out' ):
+def gen_pyx_func( code, func_parms, func_name='func', outvar_name='out' ):
 
     indent = 4*' '
 
@@ -113,20 +113,28 @@ def gen_pyx_func( code, func_parms, subs_pairs, func_name='func', outvar_name='o
     for parm in func_parms :
         ccode += ', double* ' + parm
     ccode += ' ):\n'
-
+        
     mainccode = code_to_string( code, outvar_name, indent, 'cdef double' )
-    for (old,new) in subs_pairs: mainccode = mainccode.replace(old,new)
 
     ccode += mainccode + '\n'+indent+'return\n'
     return ccode
 
 
-def code_to_func( lang, code, func_name, func_parms, subs_pairs ):
+def code_to_func( lang, code, func_name, func_parms, symb_replace ):
   lang = lang.lower()
   if lang in ['python','py'] : gen_func = gen_py_func
   elif lang in ['cython','pyx'] : gen_func = gen_pyx_func
   elif lang in ['c','c++'] : gen_func = gen_c_func
   else: raise Exception('chosen language not supported.')
-  return gen_func( code, func_parms, subs_pairs, func_name, func_name+'_out' )
+  
+  if symb_replace:
+      sympified_replace= {}
+      for k, v in symb_replace.items():
+          if isinstance(k, str): k = sympy.Symbol(k)
+          if isinstance(v, str): v = sympy.Symbol(v)
+          sympified_replace[k] = v
+      code = optimization.xreplace(code, sympified_replace)
+      
+  return gen_func( code, func_parms, func_name, func_name+'_out' )
 
 
