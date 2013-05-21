@@ -56,9 +56,10 @@ class Subexprs(object):
         argset_orderlens = self._commutatives[exprtype][1]
         
         ivar = None
-        args_to_substitute = []
+        args_to_remove = []
         args_to_insert = []
         
+        # for 2 args input exprs, bypass comparison with other 2 args exprs
         if len(args_input) == 2:
             init = argset_orderlens.lenidxs[2]
         else:
@@ -82,7 +83,8 @@ class Subexprs(object):
                     args_other = diff_args_other
                     args_other.add(ivar)
                     self._subexp_iv[exprtype(*args_other)] = self._subexp_iv.pop(exprtype(*argsets[i]))
-                    args_to_substitute.append((i, args_other))
+                    args_to_remove.append(i)
+                    args_to_insert.append(args_other)
                     
                     break
                 
@@ -105,7 +107,8 @@ class Subexprs(object):
                     args_other = diff_args_other
                     args_other.add(ivar_com)
                     self._subexp_iv[exprtype(*args_other)] = self._subexp_iv.pop(exprtype(*argsets[i]))
-                    args_to_substitute.append((i, args_other))
+                    args_to_remove.append(i)
+                    args_to_insert.append(args_other)
                     
                     args_input = diff_args_input
                     args_input.add(ivar_com)
@@ -118,9 +121,8 @@ class Subexprs(object):
             self._subexp_iv[exprtype(*args_input)] = ivar
             args_to_insert.append(args_input)
         
-        for i, args in args_to_substitute:
+        for i in reversed(sorted(args_to_remove)):
             argset_orderlens.pop(argsets, i)
-            args_to_insert.append(args)
         for args in args_to_insert:
             argset_orderlens.insert(argsets, args)
         
@@ -250,5 +252,49 @@ def fast_cse(exprs, symbols='aux'):
     se = Subexprs()
     return se.get(se.collect(exprs))
 
+
+
+
+
+
+
+
+
+
+class WholeSubexprs(object):
+        
+    def __init__(self, *args, **kwargs):
+        
+        self._tmp_symbols = sympy.utilities.iterables.numbered_symbols()
+        self._subexp_iv = list()
+
+    def collect(self, exprs):
+        
+        if isinstance(exprs, sympy.Basic): # if only one expression is passed
+            exprs = [exprs]
+            is_single_expr = True
+        else:
+            is_single_expr = False
+        
+        
+        out_exprs = []
+        for expr in exprs:
+            if expr.is_Atom or (-expr).is_Atom:
+                out_exprs.append(expr)
+            else:
+                iv = next(self._tmp_symbols)
+                self._subexp_iv.append((iv,expr))
+                out_exprs.append(iv)
+            
+        if is_single_expr:
+            return out_exprs[0]
+        elif isinstance(exprs, sympy.Matrix):
+            return sympy.Matrix(exprs.rows, exprs.cols, out_exprs)
+        else:
+            return out_exprs
+        
+    def get(self, exprs=None, symbols=None):
+        return self._subexp_iv, exprs
+    
 
 

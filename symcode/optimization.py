@@ -66,10 +66,9 @@ def inlining_singleops( code ):
     return (subexprs_ordereddict.items(), out_exps)
 
 
-def copy_propag( code ):
+def copy_propag( code, symmetric_copy=False, debug = False ):
     """Performe 'copy propagation' optimization on code."""
     
-    debug = False
     removed=0
     
     retcode = copy.deepcopy(code)
@@ -83,7 +82,7 @@ def copy_propag( code ):
         retcode[0][i] = (v,e)
         
         # copy propagation
-        if e.is_Atom:
+        if e.is_Atom or (symmetric_copy and (-e).is_Atom):
             if debug: print(i,v,e,'is atom')
             retcode = xreplace( retcode, {v:e} )
             toremove.append(i)
