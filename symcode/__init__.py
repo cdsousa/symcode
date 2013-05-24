@@ -1,7 +1,9 @@
 """Library to collect sub-expressions from SymPy expressions and generate C and Python code."""
 
+__version__ = '0.2'
+
 from . import subexprs
 from . import optimization
 from . import generation
 
-__all__ = ['cse', 'subexprs', 'optimization', 'generation']
+__all__ = ['subexprs', 'optimization', 'generation']

@@ -88,7 +88,10 @@ def gen_py_func( code, func_parms, func_name='func', outvar_name='out' ):
     
     pycode += mainpycode
 
-    pycode += '\n' + indent + 'return ' + outvar_name + '\n'
+    pycode += '\n' + indent + 'return ' + outvar_name
+    
+    pycode = pycode.replace('\n\n','\n#\n')
+    
     return pycode
 
 def gen_c_func( code, func_parms, func_name='func', outvar_name='out' ):
@@ -102,7 +105,10 @@ def gen_c_func( code, func_parms, func_name='func', outvar_name='out' ):
     
     mainccode = code_to_string( code, outvar_name, indent, 'double', ';' )
 
-    ccode += mainccode + '\n'+indent+'return;\n}\n'
+    ccode += mainccode + '\n'+indent+'return;\n}'
+    
+    ccode = ccode.replace('\n\n','\n//\n')
+    
     return ccode
 
 def gen_pyx_func( code, func_parms, func_name='func', outvar_name='out' ):
@@ -116,7 +122,7 @@ def gen_pyx_func( code, func_parms, func_name='func', outvar_name='out' ):
         
     mainccode = code_to_string( code, outvar_name, indent, 'cdef double' )
 
-    ccode += mainccode + '\n'+indent+'return\n'
+    ccode += mainccode + '\n'+indent+'return'
     return ccode
 
 
