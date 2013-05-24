@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
 name='symcode',
-version='0.2',
+version='0.2-git',
 author='Cristovao D. Sousa',
 author_email='crisjss@gmail.com',
 description='Library to collect sub-expressions from SymPy expressions and generate C and Python code',
